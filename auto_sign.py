@@ -17,10 +17,10 @@ import time
 from urllib import parse
 
 import requests
-import notify
 
-skyland_tokens = os.getenv('SKYLAND_TOKEN') or ''
-skyland_notify = os.getenv('SKYLAND_NOTIFY') or ''
+from did import getDid
+
+skyland_tokens = os.getenv('SKYLAND_TOKEN')
 
 # 消息内容
 run_message: str = ''
@@ -37,9 +37,14 @@ header = {
 header_login = {
     'User-Agent': 'Skland/1.0.1 (com.hypergryph.skland; build:100001014; Android 31; ) Okhttp/4.11.0',
     'Accept-Encoding': 'gzip',
-    'Connection': 'close'
+    'Connection': 'close',
 }
 
+header_cred = {
+    'dId': getDid(),
+    'Content-Type': 'application/json',
+    'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64; rv:130.0) Gecko/20100101 Firefox/130.0'
+}
 # 签名请求头一定要这个顺序，否则失败
 # timestamp是必填的,其它三个随便填,不要为none即可
 header_for_sign = {
@@ -58,51 +63,11 @@ sign_url = "https://zonai.skland.com/api/v1/game/attendance"
 binding_url = "https://zonai.skland.com/api/v1/game/player/binding"
 
 # 使用认证代码获得cred
-cred_code_url = "https://zonai.skland.com/api/v1/user/auth/generate_cred_by_code"
+cred_code_url = "https://zonai.skland.com/web/v1/user/auth/generate_cred_by_code"
 # 使用token获得认证代码
 grant_code_url = "https://as.hypergryph.com/user/oauth2/v2/grant"
 
 app_code = '4ca99fa6b56cc2ba'
-
-
-def sendMessage(title: str, content: str, type: str):
-    """
-    整合消息
-    :param title: 标题
-    :param content: 内容
-    :param type: 类型
-    :return: none
-    """
-    if (skyland_notify):
-        type = type.strip()
-        if type == 'TG':
-            notify.telegram_bot(title, content)
-        elif type == 'BARK':
-            notify.bark(title, content)
-        elif type == 'DD':
-            notify.dingding_bot(title, content)
-        elif type == 'FSKEY':
-            notify.feishu_bot(title, content)
-        elif type == 'GOBOT':
-            notify.go_cqhttp(title, content)
-        elif type == 'GOTIFY':
-            notify.gotify(title, content)
-        elif type == 'IGOT':
-            notify.iGot(title, content)
-        elif type == 'SERVERJ':
-            notify.serverJ(title, content)
-        elif type == 'PUSHDEER':
-            notify.pushdeer(title, content)
-        elif type == 'PUSHPLUS':
-            notify.pushplus_bot(title, content)
-        elif type == 'QMSG':
-            notify.qmsg_bot(title, content)
-        elif type == 'QYWXAPP':
-            notify.wecom_app(title, content)
-        elif type == 'QYWXBOT':
-            notify.wecom_bot(title, content)
-        else:
-            pass
 
 
 def generate_signature(token: str, path, body_or_query):
@@ -176,7 +141,7 @@ def get_cred(grant):
     resp = requests.post(cred_code_url, json={
         'code': grant,
         'kind': 1
-    }, headers=header_login).json()
+    }, headers=header_cred).json()
     if resp['code'] != 0:
         raise Exception(f'获得cred失败：{resp["messgae"]}')
     global sign_token
@@ -285,7 +250,8 @@ def main():
         print('没有设置token，请在环境变量里添加至少一个token')
         run_message = '没有设置token，请在环境变量里添加至少一个token'
     # 发送消息
-    sendMessage('森空岛签到', run_message, skyland_notify.strip())
+    if '签到成功' not in run_message:
+        QLAPI.notify('森空岛签到', run_message)
 
 
 if __name__ == "__main__":
